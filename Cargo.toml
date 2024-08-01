@@ -1,0 +1,11 @@
+[package]
+name = "balls_particles"
+version = "0.1.0"
+edition = "2021"
+authors = ["Sandra"]
+repository = "https://github.com/an-Iceberg/balls_particles"
+
+[dependencies]
+egui = "0.28.1"
+egui-macroquad = "0.15.0"
+macroquad = "0.3.26"

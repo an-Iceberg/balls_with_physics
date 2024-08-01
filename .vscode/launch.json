@@ -1,0 +1,95 @@
+{
+  "configurations": [
+    {
+      "name": "Clean",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo clean",
+      "terminalName": "Cargo",
+      "showTerminal": true
+    },
+    {
+      "name": "Fetch",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo fetch",
+      "terminalName": "Cargo",
+      "showTerminal": true
+    },
+    {
+      "name": "Test",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo test --color always --message-format human",
+      "terminalName": "Cargo",
+      "showTerminal": true,
+    },
+    {
+      "name": "Run",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo run --color always --message-format human",
+      "terminalName": "Cargo",
+      "showTerminal": true
+    },
+    {
+      "name": "Debug",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/${workspaceFolderBasename}.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "sourceLanguages": [
+        "rust"
+      ]
+    },
+    {
+      "name": "Build",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo build --color always --message-format human",
+      "terminalName": "Cargo",
+      "showTerminal": true
+    },
+    {
+      "name": "Build WASM",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo build --color always --message-format human --target wasm32-unknown-unknown",
+      "terminalName": "Cargo",
+      "showTerminal": true
+    },
+    {
+      "name": "Run release",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo run --release --color always --message-format human",
+      "terminalName": "Cargo",
+      "showTerminal": true
+    },
+    {
+      "name": "Build release",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo build --release --color always --message-format human",
+      "terminalName": "Cargo",
+      "showTerminal": true
+    },
+    {
+      "name": "Build release WASM",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "cargo build --release --color always --message-format human --target wasm32-unknown-unknown",
+      "terminalName": "Cargo",
+      "showTerminal": true
+    },
+    {
+      "name": "Vite",
+      "type": "f5anything",
+      "request": "launch",
+      "command": "vite ${workspaceFolder}/docs",
+      "terminalName": "Vite",
+      "showTerminal": true
+    },
+  ]
+}
