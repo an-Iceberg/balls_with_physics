@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use egui_macroquad::{draw, egui::{epaint::Shadow, Align2, Vec2, Visuals, Window}, ui};
+use egui_macroquad::{draw, egui::{epaint::Shadow, Align2, Slider, Vec2, Visuals, Window}, ui};
 use macroquad::{color::BLACK, rand, window::{clear_background, Conf}};
 use macroquad::prelude::*;
 
@@ -35,6 +35,7 @@ impl Ball
   #[allow(clippy::needless_return)]
   pub fn new() -> Self
   {
+    // TODO: seed randomness using srand()
     let radius = rand::gen_range(4., 40.);
     let color = Color::from_rgba(
       rand::gen_range(0, 255),
@@ -88,41 +89,42 @@ async fn main()
   let mut balls = vec![];
   // Creating 100 balls
   balls.push(Ball::new());
-  (0..99)
-    .for_each(|i|
+  for _ in 0..99
+  {
+    // Create new ball
+    let mut new_ball = Ball::new();
+    // Check if it is inside any other ball(s)
+    loop
     {
-      // Create new ball
-      let mut new_ball = Ball::new();
-      // Check if it is inside any other ball(s)
-      loop
-      {
-        // Find the first ball it overlaps with
-        let first_overlap = balls.iter()
-          .position(|ball|
-            do_circles_overlap(
-              ball.position,
-              ball.radius,
-              new_ball.position,
-              new_ball.radius,
-            )
-          );
+      // Find the first ball it overlaps with
+      let first_overlap = balls.iter()
+        .position(|ball|
+          do_circles_overlap(
+            ball.position,
+            ball.radius,
+            new_ball.position,
+            new_ball.radius,
+          )
+        );
 
-        // No overlaps, approve ball
-        if first_overlap.is_none()
-        {
-          balls.push(new_ball);
-          break;
-        }
-        // Try new position for new ball
-        else
-        {
-          new_ball.position = Vec2::new(
-            rand::gen_range(0., screen_width()),
-            rand::gen_range(0., screen_height()),
-          );
-        }
+      // No overlaps, approve ball
+      if first_overlap.is_none()
+      {
+        balls.push(new_ball);
+        break;
       }
-    });
+      // Try new position for new ball
+      else
+      {
+        new_ball.position = Vec2::new(
+          rand::gen_range(0., screen_width()),
+          rand::gen_range(0., screen_height()),
+        );
+      }
+    }
+  }
+
+  let mut ball_thickness = 2.;
 
   loop
   {
@@ -134,7 +136,7 @@ async fn main()
 
     // Draw balls
     balls.iter()
-      .for_each(|ball| draw_circle(ball.position.x, ball.position.y, ball.radius, ball.color));
+      .for_each(|ball| draw_circle_lines(ball.position.x, ball.position.y, ball.radius, ball_thickness, ball.color));
 
     // TODO: ball collision physics
     // TODO: allow user to apply impulse to balls
@@ -157,15 +159,13 @@ async fn main()
         .show(egui_context, |ui|
         {
           ui.label("Hello world");
-
           ui.separator();
-
+          ui.label("Line thickness");
+          ui.add(Slider::new(&mut ball_thickness, 1_f32..=4.));
+          ui.separator();
           ui.label(format!("# of balls: {}", balls.len()));
-
           ui.separator();
-
           ui.label(format!("fps: {}", get_fps()));
-
           ui.separator();
 
           // --- CREDITS (!important) ---
