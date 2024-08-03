@@ -1,9 +1,9 @@
 [package]
-name = "balls_particles"
-version = "0.1.0"
+name = "balls_with_physics"
+version = "0.2.0"
 edition = "2021"
 authors = ["Sandra"]
-repository = "https://github.com/an-Iceberg/balls_particles"
+repository = "https://github.com/an-Iceberg/balls_with_physics"
 
 [dependencies]
 egui = "0.28.1"
