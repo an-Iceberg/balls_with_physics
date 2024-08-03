@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Balls with physics</title>
+  <style>
+    :root {
+      box-sizing: border-box;
+    }
+
+    html,
+    body,
+    canvas {
+      margin: 0px;
+      padding: 0px;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: black;
+      outline: none;
+      overflow: hidden;
+    }
+
+    canvas {
+      width: 1290px;
+      height: 720px;
+      border: 10px solid pink;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body id="background">
+  <canvas id="glcanvas" tabindex='1'></canvas>
+
+  <!-- Minified and statically hosted version of https://github.com/not-fl3/miniquad/blob/master/native/sapp-wasm/js/gl.js -->
+  <script src="mq_js_bundle.js"></script>
+
+  <script>
+    // Disables the right click menu in browsers
+    document.querySelector('html').addEventListener('contextmenu', function (event) {
+      event.preventDefault()
+    }, false);
+  </script>
+  <script>load("balls_with_physics@v0.3.0.wasm");</script>
+</body>
+
+</html>

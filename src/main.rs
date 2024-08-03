@@ -1,3 +1,4 @@
+
 use egui_macroquad::{draw, egui::{epaint::Shadow, Align2, Slider, Visuals, Window}, ui};
 use macroquad::{color::BLACK, rand, window::{clear_background, Conf}};
 use macroquad::math::Vec2;
@@ -97,12 +98,13 @@ fn physics(balls: &mut [Ball])
   {
     for j in 0..balls.len()
     {
+      // Don't check for collision with itself
       if i == j { continue; }
 
       if do_circles_overlap(&balls[i].position, balls[i].radius, &balls[j].position, balls[j].radius)
       {
         let distance = ((balls[i].position.x - balls[j].position.x).powi(2) + (balls[i].position.y - balls[j].position.y).powi(2)).sqrt();
-        collisions.push((i, j, distance));
+        collisions.push((i, j));
 
         let overlap = 0.5 * (distance - balls[i].radius - balls[j].radius);
         // Displace current ball
@@ -114,49 +116,49 @@ fn physics(balls: &mut [Ball])
   }
 
   // Physics simulation (dynamic collision)
-  collisions.iter()
-    .for_each(|(i, j, distance)|
-    {
-      // Show collision
-      draw_line(balls[*i].position.x, balls[*i].position.y, balls[*j].position.x, balls[*j].position.y, 1., RED);
+  for (i, j) in collisions
+  {
+    // Show collision
+    draw_line(balls[i].position.x, balls[i].position.y, balls[j].position.x, balls[j].position.y, 1., RED);
 
-      // Bug: something imparts tremendous amounts of momentum in a collision
-      // Formulas: https://en.wikipedia.org/wiki/Elastic_collision#Two-dimensional_collision_with_two_moving_objects
-      let normal = vec2(
-        (balls[*j].position.x - balls[*i].position.x) / distance,
-        (balls[*j].position.y - balls[*i].position.y) / distance,
-      );
-      let k = balls[*i].velocity - balls[*j].velocity;
-      let p = 2.*(normal.x*k.x + normal.y*k.y) / (balls[*i].radius*10. + balls[*j].radius*10.);
-      balls[*i].velocity -= p*balls[*j].radius*10.*normal;
-      balls[*j].velocity += p*balls[*i].radius*10.*normal;
-    });
+    // Bug: some balls stick together when they should push each other apart after collision
 
-  balls.iter_mut()
-    .for_each(|ball|
-    {
-      ball.position += ball.velocity * get_frame_time();
+    // Formulas: https://en.wikipedia.org/wiki/Elastic_collision#Two-dimensional_collision_with_two_moving_objects
+    let v_1 = balls[i].velocity;
+    let v_2 = balls[j].velocity;
+    let x_1 = balls[i].position;
+    let x_2 = balls[j].position;
+    let m_1 = balls[i].radius * 10.;
+    let m_2 = balls[j].radius * 10.;
+    let m_δ = m_1 + m_2;
+    balls[i].velocity = v_1 - (2.*m_2 / m_δ) * (((v_1-v_2)*(x_1-x_2)) / (x_1-x_2).length().powi(2)) * (x_1 - x_2);
+    balls[j].velocity = v_2 - (2.*m_1 / m_δ) * (((v_2-v_1)*(x_2-x_1)) / (x_2-x_1).length().powi(2)) * (x_2 - x_1);
+  }
 
-      // Todo: friction/loss of energy
-      // Apply drag
-      ball.velocity *= 0.99;
+  // Updating ball positions & adjusting velocities
+  for ball in balls
+  {
+    ball.position += ball.velocity * get_frame_time();
 
-      // Below a certain speed the ball will stand still
-      if (ball.velocity.x.powi(2) + ball.velocity.y.powi(2)).abs() < 0.05
-      { ball.velocity = Vec2::ZERO; }
+    // Todo: friction/loss of energy
+    // Apply drag
+    ball.velocity *= 0.99;
 
-      // Todo: make this work better with collision, otherwise the balls gain insane velocity
-      // Wrap around screen
-      if ball.position.x < 0.
-      { ball.position.x = screen_width(); }
-      else if ball.position.x >= screen_width()
-      { ball.position.x = 0. }
+    // Below a certain speed the ball will stand still
+    if (ball.velocity.x.powi(2) + ball.velocity.y.powi(2)).abs() < 0.05
+    { ball.velocity = Vec2::ZERO; }
 
-      if ball.position.y < 0.
-      { ball.position.y = screen_height(); }
-      else if ball.position.y >= screen_height()
-      { ball.position.y = 0.; }
-    });
+    // Wrap around screen
+    if ball.position.x <= 0.
+    { ball.position.x = screen_width(); }
+    else if ball.position.x > screen_width()
+    { ball.position.x = 0. }
+
+    if ball.position.y <= 0.
+    { ball.position.y = screen_height(); }
+    else if ball.position.y > screen_height()
+    { ball.position.y = 0.; }
+  }
 }
 
 #[allow(clippy::needless_return)]
@@ -179,12 +181,14 @@ async fn main()
   let mut ball_thickness = 2.;
   let mut selected_ball = None;
   let mut selected_ball_vel: Option<usize> = None;
+  let mut speed = 0.0;
 
   loop
   {
     clear_background(BLACK);
 
-    // User input
+    // %%%%%%%%%%%%%%%%%%%% User input %%%%%%%%%%%%%%%%%%%%
+
     // Left click on ball makes a ball move around
     if is_mouse_button_pressed(MouseButton::Left)
     {
@@ -195,6 +199,7 @@ async fn main()
       }
       else
       {
+        selected_ball_vel = None;
         let mouse = Vec2::from(mouse_position());
         selected_ball = None;
         for (i, _) in balls.iter().enumerate()
@@ -217,11 +222,12 @@ async fn main()
       {
         let mouse = Vec2::from(mouse_position());
         // balls[i].velocity = balls[i].position - mouse;
-        balls[i].velocity = balls[i].position - mouse;
+        balls[i].velocity = (balls[i].position - mouse).normalize() * speed;
         selected_ball_vel = None;
       }
       else
       {
+        selected_ball = None;
         let mouse = Vec2::from(mouse_position());
         selected_ball_vel = None;
         for (i, _) in balls.iter().enumerate()
@@ -235,35 +241,61 @@ async fn main()
       }
     }
 
-    // Cancel with esc
+    if mouse_wheel().1 != 0.
+    {
+      speed += mouse_wheel().1 * 100.;
+      speed = clamp(speed, 0., 5000.);
+    }
+
+    // Cancel all inputs with esc
     if is_key_pressed(KeyCode::Escape)
     {
       selected_ball = None;
       selected_ball_vel = None;
     }
 
-    // Update game logic
+    // %%%%%%%%%%%%%%%%%%%% Update game logic %%%%%%%%%%%%%%%%%%%%
+
     if let Some(i) = selected_ball
     { balls[i].position = Vec2::from(mouse_position()); }
 
     physics(&mut balls);
 
     // Draw balls
-    balls.iter()
-      .for_each(|ball| draw_circle_lines(ball.position.x, ball.position.y, ball.radius, ball_thickness, ball.color));
+    balls.iter().for_each(|ball| draw_circle_lines(ball.position.x, ball.position.y, ball.radius, ball_thickness, ball.color));
 
-    // Drawing the «queue»
+    // Drawing an arrow in the direction of the ball launch
     if let Some(i) = selected_ball_vel
     {
       let mouse = Vec2::from(mouse_position());
-      draw_line(balls[i].position.x, balls[i].position.y, mouse.x, mouse.y, 1., GREEN);
+      let (x_1, y_1) = (mouse.x, mouse.y);
+      let (x_2, y_2) = (balls[i].position.x, balls[i].position.y);
+      let l_1 = (mouse - balls[i].position).length();
+      let l_2 = 20.;
+      let θ: f32 = 0.436332;
+      // Dynamic programming
+      // meaning, we only compute stuff once and then store & reuse the results
+      // b/c that's more efficient than to recompute them every time
+      let x_δ = x_1 - x_2;
+      let y_δ = y_1 - y_2;
+      let l_δ = l_2 / l_1;
+      let cos_θ = θ.cos();
+      let sin_θ = θ.sin();
+      // Formulas: https://math.stackexchange.com/questions/1314006/drawing-an-arrow
+      let x_3 = x_2 + l_δ*(x_δ*cos_θ + y_δ*sin_θ);
+      let y_3 = y_2 + l_δ*(y_δ*cos_θ - x_δ*sin_θ);
+      let x_4 = x_2 + l_δ*(x_δ*cos_θ - y_δ*sin_θ);
+      let y_4 = y_2 + l_δ*(y_δ*cos_θ + x_δ*sin_θ);
+
+      draw_line(x_1, y_1, x_2, y_2, 1., GREEN);
+      draw_line(x_2, y_2, x_3, y_3, 1., GREEN);
+      draw_line(x_2, y_2, x_4, y_4, 1., GREEN);
     }
 
-    // TODO: ball collision physics
-    // TODO: allow user to apply impulse to balls
-    // TODO: optional friction
+    // TODO: optional different kinds of friction behaviour
 
-    // Draw UI
+    // %%%%%%%%%%%%%%%%%%%% UI %%%%%%%%%%%%%%%%%%%%
+
     ui(|egui_context|
     {
       egui_context.set_visuals(Visuals
@@ -276,15 +308,19 @@ async fn main()
         .movable(false)
         .resizable(false)
         .anchor(Align2::RIGHT_TOP, egui_macroquad::egui::Vec2::new(-10., 10.))
-        .fixed_size(egui_macroquad::egui::Vec2::new(150., 0.))
+        .fixed_size(egui_macroquad::egui::Vec2::new(200., 0.))
         .show(egui_context, |ui|
         {
           ui.label("Left click on a ball to move it around. Left click again to release it");
           ui.label("Right click on a ball to make a queue appear. Right click again to impart velocity on it.");
+          ui.label("Mouse wheel increases/decreases speed.");
           ui.label("Esc cancels all actions.");
           ui.separator();
           ui.label("Line thickness");
           ui.add(Slider::new(&mut ball_thickness, 1_f32..=4.));
+          ui.separator();
+          ui.label("Speed");
+          ui.add(Slider::new(&mut speed, 0_f32..=5000.));
           ui.separator();
           ui.label("Friction mode");
           ui.separator();
