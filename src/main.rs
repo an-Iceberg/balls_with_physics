@@ -1,3 +1,4 @@
+#![allow(mixed_script_confusables)]
 
 use egui_macroquad::{draw, egui::{epaint::Shadow, Align2, Slider, Visuals, Window}, ui};
 use macroquad::{color::BLACK, rand, window::{clear_background, Conf}};
@@ -78,8 +79,7 @@ fn add_new_ball(balls: &mut Vec<Ball>)
       balls.push(new_ball);
       break;
     }
-    // Try new position for new ball
-    else
+    else // Try new position for new ball
     {
       new_ball.position = Vec2::new(
         rand::gen_range(0., screen_width()),
@@ -89,7 +89,7 @@ fn add_new_ball(balls: &mut Vec<Ball>)
   }
 }
 
-fn physics(balls: &mut [Ball])
+fn physics(balls: &mut [Ball], friction_mode: &FrictionMode)
 {
   let mut collisions = vec![];
 
@@ -121,8 +121,6 @@ fn physics(balls: &mut [Ball])
     // Show collision
     draw_line(balls[i].position.x, balls[i].position.y, balls[j].position.x, balls[j].position.y, 1., RED);
 
-    // Bug: some balls stick together when they should push each other apart after collision
-
     // Formulas: https://en.wikipedia.org/wiki/Elastic_collision#Two-dimensional_collision_with_two_moving_objects
     let v_1 = balls[i].velocity;
     let v_2 = balls[j].velocity;
@@ -131,8 +129,16 @@ fn physics(balls: &mut [Ball])
     let m_1 = balls[i].radius * 10.;
     let m_2 = balls[j].radius * 10.;
     let m_δ = m_1 + m_2;
-    balls[i].velocity = v_1 - (2.*m_2 / m_δ) * (((v_1-v_2)*(x_1-x_2)) / (x_1-x_2).length().powi(2)) * (x_1 - x_2);
-    balls[j].velocity = v_2 - (2.*m_1 / m_δ) * (((v_2-v_1)*(x_2-x_1)) / (x_2-x_1).length().powi(2)) * (x_2 - x_1);
+
+    // Note: vec dot product != vec mul
+    balls[i].velocity = v_1 - (2.*m_2 / m_δ) * (((v_1-v_2).dot(x_1-x_2)) / (x_1-x_2).length().powi(2)) * (x_1 - x_2);
+    balls[j].velocity = v_2 - (2.*m_1 / m_δ) * (((v_2-v_1).dot(x_2-x_1)) / (x_2-x_1).length().powi(2)) * (x_2 - x_1);
+
+    if matches!(friction_mode, FrictionMode::Collision)
+    {
+      balls[i].velocity *= 0.95;
+      balls[j].velocity *= 0.95;
+    }
   }
 
   // Updating ball positions & adjusting velocities
@@ -140,9 +146,8 @@ fn physics(balls: &mut [Ball])
   {
     ball.position += ball.velocity * get_frame_time();
 
-    // Todo: friction/loss of energy
-    // Apply drag
-    ball.velocity *= 0.99;
+    if matches!(friction_mode, FrictionMode::Drag)
+    { ball.velocity *= 0.99; }
 
     // Below a certain speed the ball will stand still
     if (ball.velocity.x.powi(2) + ball.velocity.y.powi(2)).abs() < 0.05
@@ -169,6 +174,10 @@ pub fn is_point_in_circle(point: &Vec2, circle: &Vec2, radius: f32) -> bool
 pub fn do_circles_overlap(circle_1: &Vec2, radius_1: f32, circle_2: &Vec2, radius_2: f32) -> bool
 { return ((circle_1.x - circle_2.x).powi(2) + (circle_1.y - circle_2.y).powi(2)) <= (radius_1 + radius_2).powi(2); }
 
+#[derive(PartialEq, Eq)]
+enum FrictionMode
+{ Drag, Collision, None }
+
 #[macroquad::main(window_config)]
 async fn main()
 {
@@ -182,6 +191,7 @@ async fn main()
   let mut selected_ball = None;
   let mut selected_ball_vel: Option<usize> = None;
   let mut speed = 0.0;
+  let mut friction_mode = FrictionMode::Drag;
 
   loop
   {
@@ -259,7 +269,7 @@ async fn main()
     if let Some(i) = selected_ball
     { balls[i].position = Vec2::from(mouse_position()); }
 
-    physics(&mut balls);
+    physics(&mut balls, &friction_mode);
 
     // Draw balls
     balls.iter().for_each(|ball| draw_circle_lines(ball.position.x, ball.position.y, ball.radius, ball_thickness, ball.color));
@@ -292,8 +302,6 @@ async fn main()
       draw_line(x_2, y_2, x_4, y_4, 1., GREEN);
     }
 
-    // TODO: optional different kinds of friction behaviour
-
     // %%%%%%%%%%%%%%%%%%%% UI %%%%%%%%%%%%%%%%%%%%
 
     ui(|egui_context|
@@ -308,7 +316,7 @@ async fn main()
         .movable(false)
         .resizable(false)
         .anchor(Align2::RIGHT_TOP, egui_macroquad::egui::Vec2::new(-10., 10.))
-        .fixed_size(egui_macroquad::egui::Vec2::new(200., 0.))
+        .fixed_size(egui_macroquad::egui::Vec2::new(170., 0.))
         .show(egui_context, |ui|
         {
           ui.label("Left click on a ball to move it around. Left click again to release it");
@@ -322,7 +330,13 @@ async fn main()
           ui.label("Speed");
           ui.add(Slider::new(&mut speed, 0_f32..=5000.));
           ui.separator();
-          ui.label("Friction mode");
+          ui.label("How to apply friction");
+          ui.radio_value(&mut friction_mode, FrictionMode::Drag, "Drag");
+          ui.radio_value(&mut friction_mode, FrictionMode::Collision, "Collision");
+          ui.radio_value(&mut friction_mode, FrictionMode::None, "None");
+          ui.separator();
+          if ui.button("Stop all motion").clicked()
+          { balls.iter_mut().for_each(|ball| ball.velocity = Vec2::ZERO); }
           ui.separator();
           ui.label(format!("# of balls: {}", balls.len()));
           ui.separator();
